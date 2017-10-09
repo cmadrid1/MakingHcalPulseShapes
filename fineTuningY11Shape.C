@@ -129,8 +129,8 @@ TH1F* makePulseHisto(vector<double>& pulse, int bstart, string name){
 	return htempT;
 }
 
-//void fineTunningY11Shape(){
-int main(){
+void fineTuningY11Shape(){
+//int main(){
   TCanvas *c0 = new TCanvas("PulseShape_203","",1000,800);  
   TLegend* catLeg0 = new TLegend(0.7,0.75,0.99,0.9);
   gPad->SetTopMargin(0.1);
