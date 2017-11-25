@@ -20,7 +20,7 @@
 #include "TMath.h"
 #include "TF1.h"
 
-int shiftMC  = 81; //shift MC Pulse
+int shiftMC  = 74; //shift MC Pulse
 int phase    = 0;//-81;//50; //Change phase of 203new/old and 205
 int shift    = 0;  //shift components
 int shiftpulses = 1; //Shift just 203pulses and 205pulses
@@ -64,27 +64,34 @@ TH1F* makeLandau(double sigma,std::string name){
   return gtemp;
 }
 
-double frac = 0.13;
+double frac = 0.11;
+double sh = 7.2;
 
 double fitY11results(double t){
   //Fit From Deconvolved Data
   double A,n,t0;
   A=0.104204; n=0.44064; t0=10.0186;
-  return A*(1-exp(-t/n))*exp(-t/t0);
+  if(t>sh) return A*(1-exp(-(t-sh)/n))*exp(-(t-sh)/t0);
+  else return 0.0;
 }
 
 double corTerm(double t){
   double norm,mpv,sigma;
-  norm=0.0806123; mpv=0; sigma=20;
-  return norm*TMath::Landau(t,mpv,sigma);  
+  //norm=0.0806123; //Unshifted norm
+  //norm=0.0809721; //shift of 6.9ns
+  //norm=0.0809775; //shift of 7ns
+  norm=0.0809882; //shift of 7.2ns
+  //norm=0.0810045; //shift of 7.5ns
+  //norm=0.0810316; //shift of 8ns
+  mpv=0; sigma=20;
+  if(t>sh) return norm*TMath::Landau((t-sh),mpv,sigma);  
+  else return 0.0;
 }
 
 double Y11TimePDF(double t) {
-  return (1-frac)*fitY11results(t) + frac*corTerm(t);
-
-  //double frac,shift,decay;
-  //frac=0.1; shift=0; decay=30;
-  //return A*(((1-frac)*fit + frac*exp(-(t-shift)/decay)));
+  double val = (1-frac)*fitY11results(t) + frac*corTerm(t);
+  if(val >= 0) return val;
+  else return 0.0;
 }
 
 double onePulse(double t, double A, double sigma, double theta, double m) {
@@ -128,6 +135,7 @@ TH1F* makeY11Histo(string name){
     htemp->SetBinContent(i+9,Y11TimePDF(i));
   }
   //std::cout<<"Norm of Y11: "<<htemp->Integral(0,htemp->GetNbinsX()+1)<<std::endl;
+  //htemp->Scale(1.0/htemp->Integral(0,htemp->GetNbinsX()+1));
   htemp->Scale(1.0/htemp->GetBinContent(htemp->GetMaximumBin()));
   return htemp;
 }
@@ -145,7 +153,7 @@ TH1F* makePulseHisto(vector<double>& pulse, int bstart, string name){
 void fineTuningY11Shape(){
 //int main(){
   TCanvas *c0 = new TCanvas("PulseShape_203","",1000,800);  
-  TLegend* catLeg0 = new TLegend(0.6,0.75,0.99,0.9);
+  TLegend* catLeg0 = new TLegend(0.8,0.72,0.99,0.87);
   gPad->SetTopMargin(0.1);
   gPad->SetBottomMargin(0.15);
   gPad->SetRightMargin(0.05);
@@ -171,29 +179,42 @@ void fineTuningY11Shape(){
   h203_MC->SetStats(false);
   h203_MC->SetLineColor(kRed);
   h203_MC->Draw("hist");
+  //h203_MC->Print("all");
   catLeg0->SetBorderSize(0);
   catLeg0->SetFillStyle(0);
   catLeg0->SetTextSize(0.04);
-  catLeg0->AddEntry(h203_MC,"203 (Y11+Landau)","l");
+  catLeg0->AddEntry(h203_MC,"206","l");
   catLeg0->Draw();
   
   TH1F* h205_pulses = NULL;
   h205_pulses = makePulseHisto(s205,69+shiftpulses+phase,"205");
-  h205_pulses->SetLineColor(kBlue);
-  //h205_pulses->Draw("same hist");
-  //catLeg0->AddEntry(h205_pulses,"205","l");
+  h205_pulses->SetLineColor(kGreen+2);
+  h205_pulses->Draw("same hist");
+  catLeg0->AddEntry(h205_pulses,"205","l");
 
   TH1F* new205 = NULL;
   new205 = makeLandau(4.57,"New 205");
   new205->Draw("hist same");
-  new205->SetLineColor(kBlue);
-  catLeg0->AddEntry(new205,"New 205");
+  //new205->SetLineColor(kBlue);
+  //catLeg0->AddEntry(new205,"New 205");
 
   TH1F* h203_pulses = NULL;
   h203_pulses = makePulseHisto(s203,65+shiftpulses+phase,"203");
   h203_pulses->SetLineColor(kBlack);
   h203_pulses->Draw("same hist");
   catLeg0->AddEntry(h203_pulses,"203","l");
+
+  TH1F* h206_pulses = NULL;
+  h206_pulses = makePulseHisto(s206,76+shiftpulses+phase,"206 pulse");
+  h206_pulses->SetLineColor(kGreen);
+  //h206_pulses->Draw("same hist");
+  //catLeg0->AddEntry(h206_pulses,"206 pulse","l");
+
+  TH1F* h207_pulses = NULL;
+  h207_pulses = makePulseHisto(s207,70+shiftpulses+phase,"207");
+  h207_pulses->SetLineColor(kBlue);
+  h207_pulses->Draw("same hist");
+  catLeg0->AddEntry(h207_pulses,"207","l");
 
   TCanvas *c1 = new TCanvas("PulseShape_Y11","",1000,800);  
   TLegend* catLeg1 = new TLegend(0.55,0.65,0.99,0.9);
@@ -266,19 +287,17 @@ void fineTuningY11Shape(){
 
   TH1F* htemp = new TH1F("","",251,-10.,250);
   TF1 *Y11 = new TF1("Y11","Y11TimePDF(x)",-10,250);
-  //TF1 *Y11 = new TF1("Y11","0.87*fitY11results(x) + 0.13*0.0806123*TMath::Landau(x,0,20)",-10,250);
-  TF1 *fitY11 = new TF1("fitY11","0.87*fitY11results(x)",-10,250);
-  TF1 *CorTerm = new TF1("CorTerm","0.13*corTerm(x)",-10,250);
-  //TF1 *CorTerm = new TF1("CorTerm","0.13*0.0806123*TMath::Landau(x,0,20);",-10,250);
+  TF1 *fitY11 = new TF1("fitY11","0.89*fitY11results(x)",-10,250);
+  TF1 *CorTerm = new TF1("CorTerm","0.11*corTerm(x)",-10,250);
   std::cout<<"norm of overallY11  "<<1/Y11->Integral(0,250)<<std::endl;
   std::cout<<"norm of fitY11 "<<1/fitY11->Integral(0,250)<<std::endl;
   std::cout<<"norm of Landau "<<1/CorTerm->Integral(0,250)<<std::endl;
   htemp->SetMinimum(0.000001);
-  htemp->SetMaximum(0.09);
+  htemp->SetMaximum(0.08);
   //htemp->GetXaxis()->SetRange(0,100);  
   htemp->GetXaxis()->SetTitle("time (ns)");
   htemp->GetYaxis()->SetTitle("A.U.");
-  htemp->SetTitle("Scintillator+Y11 Components (#sigma = 20)");
+  htemp->SetTitle("Scintillator+Y11 Components");
   htemp->SetName("Shape Comparison");
   htemp->SetTitleSize(0.002);
   htemp->SetTitleSize(0.05,"X");
@@ -306,15 +325,15 @@ void fineTuningY11Shape(){
 
   //std::cout<<Y11TimePDF(-0.07)<<std::endl;
   //std::cout<<Y11TimePDF(-0.07)<<std::endl;
-  std::cout<<TMath::Landau(2,0,20)<<std::endl;
+  //std::cout<<TMath::Landau(2,0,20)<<std::endl;
     
   //hand203new->Print("all");
   //hand203old->Print("all");
   //hand205->Print("all");
   
-  c0->SaveAs("203_new205_NewY11comparison.pdf");
-  c1->SaveAs("Y11Comparison.pdf");
-  c2->SaveAs("Y11components_sigma20.pdf");
+  c0->SaveAs("203_205_new205_206.pdf");
+  //c1->SaveAs("Y11Comparison.pdf");
+  //c2->SaveAs("Y11components.pdf");
   //h203_MC->Print("all");
   //h203_pulses->Print("all");
   //h205_pulses->Print("all");
